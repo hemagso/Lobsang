@@ -12,74 +12,24 @@ following methods:
 # Licence: MIT
 
 import numpy as np
-
 import matplotlib.pyplot as plt
+
 from matplotlib import gridspec
 from matplotlib.axes import Axes
-
 from typing import List, AnyStr, Tuple, Union
-
 from .levels import infer_measurement_level
-
-
-def _label_barh(ax: Axes, labels: List[AnyStr]):
-    """"Labels the bars of a matplotlib Horizontal Bar Plot (plt.barh)
-
-    todo: Adjust Axis scales to fit the labels
-
-    Parameters
-    ----------
-    ax: Axes object containing the plot we wish to label
-    labels: List containing the labels of each column
-    """
-    bars = ax.patches
-    assert len(bars) == len(labels), "Number of labels is different from the number of bars"
-    for bar, label in zip(bars, labels):
-        x = bar.get_width()
-        y = bar.get_y() + bar.get_height() / 2
-        ax.text(x, y, label, ha='left', va='center')
-
-
-def _label_bar(ax: Axes, labels: List[AnyStr]):
-    """"Labels the bars of a matplotlib Bar Plot (plt.bar)
-
-    todo: Adjust Axis scales to fit the labels
-
-    Parameters
-    ----------
-    ax: Axes object containing the plot we wish to label
-    labels: List containing the labels of each column
-    """
-    bars = ax.patches
-    assert len(bars) == len(labels), "Number of labels is different from the number of bars"
-    for bar, label in zip(bars, labels):
-        x = bar.get_x() + bar.get_width()/2
-        y = bar.get_height()
-        ax.text(x, y, label, ha='center', va='bottom')
-
-
-def _make_percentage_labels(values: List[float], decimals: int = 1):
-    """"Create percentage labels from a collection of values
-
-    This function transforms a list of values into a list of percentages correspondent to those values.
-    The percentages will be calculated by dividing each value by the sum of all values in the collection.
-
-    Parameters
-    ----------
-    values: A list of numbers
-    decimals: The number of decimal places to be used in the percentages. Default: 1.
-
-    Returns
-    ----------
-    labels: List containing strings with the percentages
-    """
-    values = np.array(values)
-    values = values / values.sum()
-    labels = ["{value:.{decimals}%}".format(value=value, decimals=decimals) for value in values]
-    return labels
+from .chart_helpers import label_bar, label_barh, make_percentage_labels
 
 
 def _missing_distribution(arr: np.array, ax: Axes, **kwargs):
+    """"Create a plot for missing values distribution in an numpy array
+
+    Parameters
+    ----------
+    arr: Array containing the data
+    ax: Matplotlib Axes object where we will draw the chart.
+    **kwargs: Other named parameters that will be forwarded to _make_percentage_labels and matplotlib plot methods.
+    """
     n = len(arr)
     n_miss = np.isnan(arr).sum()
     n_fill = n - n_miss
@@ -88,15 +38,23 @@ def _missing_distribution(arr: np.array, ax: Axes, **kwargs):
     values = [n_fill, n_miss]
 
     ax.barh(headers, values, **kwargs)
-    labels = _make_percentage_labels(values)
-    _label_barh(ax, labels)
+    labels = make_percentage_labels(values, **kwargs)
+    label_barh(ax, labels)
 
 
 def _filled_distribution(arr: np.array, ax: Axes, **kwargs):
+    """"Create a plot of the distribution of filled values in a numpy array
+
+    Parameters
+    ----------
+    arr: Array containing the data
+    ax: Matplotlib Axes object where we will draw the chart.
+    **kwargs: Other named parameters that will be forwarded to _make_percentage_labels and matplotlib plot methods.
+    """
     arr_notna = arr[~np.isnan(arr)]
-    values, _, bars = ax.hist(arr_notna, **kwargs)
-    labels = _make_percentage_labels(values)
-    _label_bar(ax, labels)
+    values, _, bars = ax.hist(arr_notna, edgecolor="white", **kwargs)
+    labels = make_percentage_labels(values, **kwargs)
+    label_bar(ax, labels)
 
 
 def interval_distribution(arr: np.array, **kwargs) -> Tuple[plt.Figure, Tuple[Axes, Axes]]:
@@ -128,9 +86,30 @@ def interval_distribution(arr: np.array, **kwargs) -> Tuple[plt.Figure, Tuple[Ax
 
 
 def nominal_distribution(arr: np.array, **kwargs) -> Tuple[plt.Figure, Tuple[Axes]]:
+    """"Plot a distribution analysis for nominal scaled features
+
+    Parameters
+    ----------
+        arr: Numpy array, the array containing the data.
+        **kwargs: Keyword arguments that will be forwarded to the underlying matplotlib functions.
+
+    Returns
+    -----------
+        fig, (ax_fill, ax_dist)
+        fig: Matplotlib figure
+        ax_fill: Matplotlib Axes object for the missing values distribution plot
+        ax_dist: Matplotlib Axes object for the filled values distribution plot
+    """
     fig = plt.figure()
-    gs = gridspec.GridSpec(1, 1, figure=fig, height_ratios=(1, 1))
+    gs = gridspec.GridSpec(1, 1, figure=fig)
     ax = plt.subplot(gs[0])
+
+    values, counts = np.unique(arr, return_counts=True)
+    values = [str(v) for v in values]
+    ax.barh(values, counts)
+
+    labels = make_percentage_labels(counts, **kwargs)
+    label_barh(ax, labels)
 
     return fig, ax
 
